@@ -29,6 +29,25 @@ RSpec.describe SponsoredLogs do
     end
   end
 
+  describe "partial_ads configuration" do
+    it "defaults to false" do
+      expect(described_class.configuration.partial_ads).to be(false)
+    end
+
+    it "is applied via sponsor!/assign" do
+      described_class.sponsor!(partial_ads: true)
+
+      expect(described_class.configuration.partial_ads).to be(true)
+    end
+
+    it "accepts string keys through assign" do
+      config = SponsoredLogs::Configuration.new
+      config.assign({ "partial_ads" => true }, warn_to: StringIO.new)
+
+      expect(config.partial_ads).to be(true)
+    end
+  end
+
   describe ".render_html_comment" do
     it "wraps the picked ad text as an HTML comment", :aggregate_failures do
       described_class.sponsor!(ads: [{ text: "Buy widgets now", weight: 1 }])
@@ -109,6 +128,45 @@ RSpec.describe SponsoredLogs do
   end
 
   describe SponsoredLogs::HtmlComment do
+    describe ".injectable?" do
+      it "accepts a fragment with a real closing element tag", :aggregate_failures do
+        expect(described_class.injectable?("<div>hello world here</div>")).to be(true)
+        expect(described_class.injectable?("<ul><li>one</li><li>two</li></ul>")).to be(true)
+        expect(described_class.injectable?("<section><p>Body copy goes here.</p></section>")).to be(true)
+      end
+
+      it "skips a script fragment", :aggregate_failures do
+        expect(described_class.injectable?("<script>var x = 1;</script>")).to be(false)
+        expect(described_class.injectable?("<SCRIPT>alert(1)</SCRIPT>")).to be(false)
+        expect(described_class.injectable?("<div><script>var y=2;</script></div>")).to be(false)
+      end
+
+      it "skips a JSON-looking fragment", :aggregate_failures do
+        expect(described_class.injectable?('{ "a": 1, "b": 2 }')).to be(false)
+        expect(described_class.injectable?('[ { "a": 1 }, { "b": 2 } ]')).to be(false)
+      end
+
+      it "skips a bare text or whitespace fragment", :aggregate_failures do
+        expect(described_class.injectable?("just some plain text with no tags")).to be(false)
+        expect(described_class.injectable?("     \n\t   ")).to be(false)
+        expect(described_class.injectable?("")).to be(false)
+        expect(described_class.injectable?(nil)).to be(false)
+      end
+
+      it "skips an SVG-only fragment" do
+        expect(described_class.injectable?("<svg><circle r='5'></circle></svg>")).to be(false)
+      end
+
+      it "skips an attribute-or-void-only fragment with no closing tag", :aggregate_failures do
+        expect(described_class.injectable?('<input type="text" name="q" />')).to be(false)
+        expect(described_class.injectable?("<br><hr>")).to be(false)
+      end
+
+      it "skips a fragment below the trivial length floor" do
+        expect(described_class.injectable?("<i>x</i>")).to be(false)
+      end
+    end
+
     describe ".escape" do
       it "leaves copy without hyphen runs untouched" do
         expect(described_class.escape("plain copy")).to eq("plain copy")

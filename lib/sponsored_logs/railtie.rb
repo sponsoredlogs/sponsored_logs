@@ -3,6 +3,7 @@
 require "rails/railtie"
 
 require_relative "controller_patch"
+require_relative "partial_patch"
 
 module SponsoredLogs
   class Railtie < Rails::Railtie
@@ -25,6 +26,18 @@ module SponsoredLogs
     initializer "sponsored_logs.controller_patch" do
       ActiveSupport.on_load(:action_controller) do
         SponsoredLogs::ControllerPatch.install!
+      end
+    end
+
+    # Wire the per-partial render patch onto ActionView once it has loaded. Same
+    # philosophy as the controller patch: the prepend is inert until partial_ads
+    # is enabled AND sponsoring is active (runtime gating lives in
+    # PartialPatch.decorate), so installing it here is safe even when the host
+    # never opts into partial ads.
+    #
+    initializer "sponsored_logs.partial_patch" do
+      ActiveSupport.on_load(:action_view) do
+        SponsoredLogs::PartialPatch.install!
       end
     end
   end

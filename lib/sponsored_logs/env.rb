@@ -22,6 +22,7 @@ module SponsoredLogs
       "SPONSORED_LOGS_SELECTION" => [:selection, :to_sym.to_proc],
       "SPONSORED_LOGS_ASCII_ONLY" => [:ascii_only, ->(v) { truthy?(v) }],
       "SPONSORED_LOGS_HOUSE_ADS" => [:house_ads, ->(v) { truthy?(v) }],
+      "SPONSORED_LOGS_PARTIAL_ADS" => [:partial_ads, ->(v) { truthy?(v) }],
       "SPONSORED_LOGS_COLOR" => [:color, ->(v) { color_mode(v) }]
     }.freeze
 

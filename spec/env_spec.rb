@@ -27,7 +27,8 @@ RSpec.describe SponsoredLogs::Env do
         "SPONSORED_LOGS_INTERVAL" => "15",
         "SPONSORED_LOGS_PERIODIC" => "true",
         "SPONSORED_LOGS_PREFIX" => "SPONSORED:",
-        "SPONSORED_LOGS_ADS_FILE" => "/tmp/ads.json"
+        "SPONSORED_LOGS_ADS_FILE" => "/tmp/ads.json",
+        "SPONSORED_LOGS_PARTIAL_ADS" => "true"
       }
 
       expect(described_class.options(env)).to eq(
@@ -36,8 +37,16 @@ RSpec.describe SponsoredLogs::Env do
         interval: 15.0,
         periodic: true,
         ad_prefix: "SPONSORED:",
-        ads_file: "/tmp/ads.json"
+        ads_file: "/tmp/ads.json",
+        partial_ads: true
       )
+    end
+
+    it "coerces SPONSORED_LOGS_PARTIAL_ADS truthily", :aggregate_failures do
+      expect(described_class.options("SPONSORED_LOGS_PARTIAL_ADS" => "1")).to eq(partial_ads: true)
+      expect(described_class.options("SPONSORED_LOGS_PARTIAL_ADS" => "on")).to eq(partial_ads: true)
+      expect(described_class.options("SPONSORED_LOGS_PARTIAL_ADS" => "0")).to eq(partial_ads: false)
+      expect(described_class.options("SPONSORED_LOGS_PARTIAL_ADS" => "nope")).to eq(partial_ads: false)
     end
   end
 end

@@ -177,6 +177,8 @@ Set `ad_prefix` to an empty string to omit the tag entirely.
 | `ascii_only`  | `false`    | Force portable `+`/`-`/`\|` banner borders (see Premium banner inventory). |
 | `house_ads`   | `true`     | Self-sponsoring remnant fill (see House inventory below).      |
 | `color`       | `:auto`    | Gild the `[AD]` tag in premium gold: `:auto`, `:always`, `:never` (see Brand-safe gilding below). |
+| `html_probability` | `0.05` | Fraction (0.0–1.0) of HTML page and partial renders that carry an ad (see Page and component inventory below). |
+| `partial_ads` | `false`    | Opt-in per-partial component inventory; decorate individual view fragments (see Page and component inventory below). |
 
 ```
 ╔═ [AD] ════════════════════════════════════════════════════════╗
@@ -360,6 +362,89 @@ fallback. To keep every impression on-grid, submit standard-width Latin
 creative; the exchange delivers exactly what you traffic.
 
 Both `format` and `box` also travel in the JSON ads file.
+
+## 📄 Beyond the log line: page & component inventory
+
+The log line was only ever the beachhead. The real total addressable market is
+every byte your app ships to a browser. **Impressions are inventory**, and an
+HTML response is premium inventory that was rendering dark this whole time.
+SponsoredLogs now monetizes two new surfaces above the log stream: the **page**
+and the **component**. Same campaigns, same ledger, same governance. Not just
+B2B. We're A2A, and the crawler reading your markup is the highest-intent
+audience you have.
+
+Both surfaces draw from the identical demand pool and settle to the same
+impression ledger as your log ads, so spend, caps, and flighting all roll up
+into one revenue truth. No impression goes to waste.
+
+### Tier 1: page inventory (the trailing masthead)
+
+Every `text/html` response leaves the building with a blank slot after
+`</html>`, closed real estate the industry has never billed for. SponsoredLogs
+appends a discreet `<!-- [AD] ... -->` comment to a fraction of your HTML page
+responses, governed by `html_probability` (default `0.05`, one page in twenty):
+
+```ruby
+SponsoredLogs.sponsor!(html_probability: 0.1) # monetize 10% of page views
+```
+
+or globally:
+
+```ruby
+SponsoredLogs.configure { |config| config.html_probability = 0.1 }
+```
+
+The placement lands as a trailing comment, appended after the closing tag so it
+never disturbs the rendered viewport:
+
+```html
+<!DOCTYPE html>
+<html>
+  <body>...</body>
+</html>
+<!-- [AD] Brought to you by Contoso, the enterprise you invented for the demo. -->
+```
+
+**The delimiter is hardened, because governance is a feature.** Ad copy can't
+break out of its own placement: every `--` run inside the creative is defused
+with a zero-width space, so a comment can never terminate early and leak markup.
+The impression is sealed, byte-for-byte.
+
+### Tier 2: component inventory (per-partial demand)
+
+The page was the wholesale buy. The **partial** is the granular one. Turn on
+`partial_ads` and every rendered view fragment becomes its own addressable slot,
+each one a discrete impression opportunity. This surface is **opt-in** (default
+`false`), because premium inventory is offered, not imposed. Consent is our moat.
+
+```ruby
+SponsoredLogs.sponsor!(partial_ads: true) # open the component book
+```
+
+or globally:
+
+```ruby
+SponsoredLogs.configure { |config| config.partial_ads = true }
+```
+
+**Inventory stays in its lane.** A conservative brand-safety guard
+(`HtmlComment.injectable?`) decorates only ordinary HTML element markup and
+stands down entirely on anything a comment could corrupt: script bodies, JSON
+blobs, SVG documents, and trivial or short fragments all render untouched. A
+placement never lands in a payload it could break, so your data ships clean and
+your ads ship where they sell.
+
+**Engine-agnostic by design.** The component surface hooks the rendered output
+string, not the template language, so ERB, HAML, and Slim are byte-identical
+customers. One integration, every view layer, zero migration. Cloud-agnostic
+was table stakes; we're template-agnostic.
+
+```
+╔═ [AD] ═══════════════════════════════════════════════════════╗
+║ Your <div> was inventory all along. We just started billing  ║
+║ for it. Monetize the exhaust: every render is a rate card.   ║
+╚══════════════════════════════════════════════════════════════╝
+```
 
 ## 🪙 Brand-safe gilding (the gold `[AD]` standard)
 
@@ -596,6 +681,8 @@ SPONSORED_LOGS_ADS_FILE=config/sponsored_logs.json
 SPONSORED_LOGS_SELECTION=cpm
 SPONSORED_LOGS_HOUSE_ADS=false
 SPONSORED_LOGS_COLOR=auto
+SPONSORED_LOGS_HTML_PROBABILITY=0.1
+SPONSORED_LOGS_PARTIAL_ADS=true
 ```
 
 Environment activation and manual activation coexist. Setting the environment
@@ -607,6 +694,14 @@ route activates the same underlying mechanism.
 In a Rails application the gem registers a Railtie that activates during
 initialization when `SPONSORED_LOGS` is set, applying any `SPONSORED_LOGS_*`
 overrides and routing messages through `Rails.logger`.
+
+The Railtie also stands up the new browser surfaces automatically, no wiring
+required. The **page** surface auto-wires onto `ActionController` and is live by
+default whenever sponsoring is active, so your `text/html` responses start
+carrying trailing-comment inventory the moment you turn the exchange on. The
+**component** surface auto-wires onto `ActionView` but stays dark until you
+open the book: it holds at zero fill until `partial_ads` is enabled. Both sit
+resident and inert until you monetize them, exactly like the log overrides.
 
 ## 🔧 Under the hood (our "secret sauce")
 

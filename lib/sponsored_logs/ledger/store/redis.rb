@@ -9,14 +9,18 @@ module SponsoredLogs
         def initialize(client: nil, namespace: DEFAULT_NAMESPACE)
           super()
           @client = client || build_default_client
+          @namespace = namespace
           @impressions_key = "#{namespace}:impressions"
           @cpm_key = "#{namespace}:cpm"
           @text_key = "#{namespace}:text"
         end
 
-        def record(ad)
+        def record(ad = nil, surface: Surfaces::UNKNOWN, **ad_kwargs)
+          ad = Store.coerce_ad(ad, ad_kwargs)
           id = Identity.id_for(ad)
+          surface = Surfaces.coerce(surface)
           @client.hincrby(@impressions_key, id, 1)
+          @client.hincrby(surface_key(surface), id, 1)
           @client.hset(@cpm_key, id, ad[:cpm].to_f)
           @client.hset(@text_key, id, ad[:text].to_s)
         end
@@ -31,12 +35,28 @@ module SponsoredLogs
           end
         end
 
+        def surface_snapshot
+          Surfaces::ALL.each_with_object({}) do |surface, acc|
+            @client.hgetall(surface_key(surface)).each do |id, count|
+              (acc[id] ||= {})[surface] = count.to_i
+            end
+          end
+        end
+
         def reset
-          @client.del(@impressions_key, @cpm_key, @text_key)
+          @client.del(@impressions_key, @cpm_key, @text_key, *Surfaces::ALL.map { |s| surface_key(s) })
           self
         end
 
         private
+
+        # One impressions hash per surface, so a surface tally increments
+        # atomically the same way the per-ad total does (HINCRBY), never a
+        # read-modify-write.
+        #
+        def surface_key(surface)
+          "#{@namespace}:impressions:#{surface}"
+        end
 
         # Lazy-require keeps redis an optional dependency.
         #

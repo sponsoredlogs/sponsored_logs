@@ -72,6 +72,24 @@ RSpec.describe SponsoredLogs do
         .to change { described_class.ledger.total_impressions }.by(1)
     end
 
+    it "records to the :page surface by default" do
+      described_class.reset_ledger!
+      described_class.sponsor!(ads: [{ text: "Track me", weight: 1, cpm: 10.0 }])
+
+      described_class.render_html_comment
+
+      expect(described_class.report[:impressions_by_surface]).to eq(log: 0, page: 1, partial: 0, unknown: 0)
+    end
+
+    it "records to the surface passed through to HtmlComment.render" do
+      described_class.reset_ledger!
+      described_class.sponsor!(ads: [{ text: "Track me", weight: 1, cpm: 10.0 }])
+
+      SponsoredLogs::HtmlComment.render(described_class.configuration, described_class.ledger, surface: :partial)
+
+      expect(described_class.report[:impressions_by_surface]).to eq(log: 0, page: 0, partial: 1, unknown: 0)
+    end
+
     it "returns nil when no ad can be picked" do
       described_class.sponsor!
       allow(SponsoredLogs::Advertisers).to receive(:pick).and_return(nil)

@@ -13,8 +13,9 @@ module SponsoredLogs
         @store = store
       end
 
-      def record(ad)
-        @store.record(ad)
+      def record(ad = nil, surface: Surfaces::UNKNOWN, **ad_kwargs)
+        ad = Store.coerce_ad(ad, ad_kwargs)
+        @store.record(ad, surface: surface)
       end
 
       def total_impressions
@@ -41,6 +42,22 @@ module SponsoredLogs
       #
       def impression_counts
         @store.snapshot.transform_values { |data| data[:impressions] }
+      end
+
+      # Aggregate impressions by surface across all ads, as { log:, page:,
+      # partial:, unknown: } with every known surface present (zero-filled).
+      # Derived from the store's optional per-surface breakdown; a store that
+      # predates surfaces (no #surface_snapshot) reports all zeros rather than
+      # raising, so custom duck-typed stores keep working.
+      #
+      def impressions_by_surface
+        totals = Surfaces::ALL.to_h { |surface| [surface, 0] }
+        return totals unless @store.respond_to?(:surface_snapshot)
+
+        @store.surface_snapshot.each_value do |tally|
+          tally.each { |surface, count| totals[Surfaces.coerce(surface)] += count.to_i }
+        end
+        totals
       end
 
       def reset

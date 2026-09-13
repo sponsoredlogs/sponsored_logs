@@ -258,6 +258,17 @@ RSpec.describe SponsoredLogs do
       expect(described_class.report[:impressions]).to eq(0)
     end
 
+    it "exposes an impressions_by_surface breakdown, with emit counted as :log", :aggregate_failures do
+      described_class.reset_ledger!
+      described_class.sponsor!(ads: [{ text: "Solo", weight: 1, cpm: 20.0 }])
+
+      3.times { described_class.emit(StringIO.new) }
+      report = described_class.report
+
+      expect(report[:impressions_by_surface]).to eq(log: 3, page: 0, partial: 0, unknown: 0)
+      expect(report[:impressions]).to eq(3)
+    end
+
     it "lists scheduled ads under upcoming, even with zero impressions", :aggregate_failures do
       described_class.reset_ledger!
       described_class.sponsor!(ads: [
@@ -388,6 +399,17 @@ RSpec.describe SponsoredLogs do
 
       text = described_class.report_text
       expect(text.index("pricey")).to be < text.index("cheap")
+    end
+
+    it "appends a per-surface breakdown line", :aggregate_failures do
+      described_class.reset_ledger!
+      described_class.sponsor!(ads: [{ text: "Solo", weight: 1, cpm: 20.0 }])
+      5.times { described_class.emit(StringIO.new) }
+
+      text = described_class.report_text
+
+      expect(text).to include("By surface:")
+      expect(text).to match(/By surface: log 5 \| page 0 \| partial 0 \| unknown 0/)
     end
   end
 

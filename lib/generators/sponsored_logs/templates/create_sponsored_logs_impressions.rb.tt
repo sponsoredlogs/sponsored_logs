@@ -8,6 +8,14 @@ class CreateSponsoredLogsImpressions < ActiveRecord::Migration[<%= ActiveRecord:
       t.integer :impressions, null: false, default: 0
       t.float   :cpm,         null: false, default: 0.0
 
+      # Per-surface tallies. Each sums up into :impressions above; the report
+      # breaks the total down by where the impression served.
+      #
+      t.integer :impressions_log,     null: false, default: 0
+      t.integer :impressions_page,    null: false, default: 0
+      t.integer :impressions_partial, null: false, default: 0
+      t.integer :impressions_unknown, null: false, default: 0
+
       t.timestamps
     end
 

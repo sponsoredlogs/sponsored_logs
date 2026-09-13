@@ -9,6 +9,7 @@ require_relative "sponsored_logs/identity"
 require_relative "sponsored_logs/flight"
 require_relative "sponsored_logs/banner"
 require_relative "sponsored_logs/ads_file"
+require_relative "sponsored_logs/surfaces"
 require_relative "sponsored_logs/ledger/store/base"
 require_relative "sponsored_logs/ledger/store/memory"
 require_relative "sponsored_logs/ledger/store/redis"
@@ -80,7 +81,7 @@ module SponsoredLogs
       )
       return if ad.nil?
 
-      ledger.record(ad)
+      ledger.record(ad, surface: Surfaces::LOG)
       line = Advertisers.render(
         ad, configuration.ad_prefix,
         ascii_only: configuration.ascii_only,
@@ -99,21 +100,24 @@ module SponsoredLogs
     end
 
     # HTML analog of maybe_emit, gated by its own html_probability knob because
-    # page renders are rarer than per-puts log lines.
+    # page renders are rarer than per-puts log lines. surface: is forwarded to
+    # the ledger so the controller (:page) and partial (:partial) hooks tally to
+    # the right surface; it defaults to :page for existing callers.
     #
-    def maybe_html_comment
+    def maybe_html_comment(surface: Surfaces::PAGE)
       return unless active?
       return unless rand < configuration.html_probability
 
-      render_html_comment
+      render_html_comment(surface: surface)
     end
 
     # Pick, record, and wrap one ad as a hardened HTML comment (nil when none is
-    # eligible). Delegates to the shared HtmlComment core so the controller
-    # patch and, later, the partial hook reuse one path and one ledger.
+    # eligible). Delegates to the shared HtmlComment core so the controller patch
+    # and the partial hook reuse one path and one ledger. surface: records where
+    # the impression served and defaults to :page.
     #
-    def render_html_comment
-      HtmlComment.render(configuration, ledger)
+    def render_html_comment(surface: Surfaces::PAGE)
+      HtmlComment.render(configuration, ledger, surface: surface)
     end
 
     # Rebuilt when the configured store changes, so swapping the store via
@@ -144,6 +148,7 @@ module SponsoredLogs
 
       {
         impressions: ledger.total_impressions,
+        impressions_by_surface: ledger.impressions_by_surface,
         spend: ledger.total_spend.round(2),
         ads: grouped[:running],
         upcoming: grouped[:upcoming],
@@ -158,17 +163,14 @@ module SponsoredLogs
     def report_text
       data = report
       rows = data[:ads].sort_by { |ad| -ad[:spend] }
-
       width = rows.map { |ad| ad[:text].length }.push(4).max
-      lines = [format("%-#{width}s  %8s  %7s  %9s", "Ad", "Impr", "CPM", "Spend")]
-      lines << ("-" * (width + 30))
+      rule = "-" * (width + 30)
 
-      rows.each do |ad|
-        lines << format("%-#{width}s  %8d  %7.2f  %9.2f", ad[:text], ad[:impressions], ad[:cpm], ad[:spend])
-      end
-
-      lines << ("-" * (width + 30))
+      lines = [format("%-#{width}s  %8s  %7s  %9s", "Ad", "Impr", "CPM", "Spend"), rule]
+      rows.each { |ad| lines << format("%-#{width}s  %8d  %7.2f  %9.2f", ad[:text], ad[:impressions], ad[:cpm], ad[:spend]) }
+      lines << rule
       lines << format("%-#{width}s  %8d  %7s  %9.2f", "TOTAL", data[:impressions], "", data[:spend])
+      lines << surface_breakdown_line(data[:impressions_by_surface])
       lines.join("\n")
     end
 
@@ -239,6 +241,15 @@ module SponsoredLogs
         cap: meta[:cap],
         status: status
       }
+    end
+
+    # A single "By surface" footer line for report_text, listing each surface's
+    # impression total in the fixed Surfaces::ALL order, e.g.
+    # "By surface: log 1240 | page 88 | partial 402 | unknown 0".
+    #
+    def surface_breakdown_line(by_surface)
+      parts = Surfaces::ALL.map { |surface| "#{surface} #{by_surface.fetch(surface, 0)}" }
+      "By surface: #{parts.join(" | ")}"
     end
 
     # Roll every report row up to its advertiser: total impressions, spend, and

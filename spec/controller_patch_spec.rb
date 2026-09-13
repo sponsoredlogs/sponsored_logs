@@ -55,6 +55,15 @@ RSpec.describe SponsoredLogs::ControllerPatch do
     expect(body).to match(%r{</html>.*<!-- \[AD\] Trailing ad -->}m)
   end
 
+  it "records the impression to the :page surface", :aggregate_failures do
+    SponsoredLogs.reset_ledger!
+    SponsoredLogs.sponsor!(html_probability: 1.0, ads: [{ text: "Trailing ad", weight: 1, cpm: 10.0 }])
+
+    call(html_controller, :show)
+
+    expect(SponsoredLogs.report[:impressions_by_surface]).to eq(log: 0, page: 1, partial: 0, unknown: 0)
+  end
+
   it "does not touch a non-HTML response", :aggregate_failures do
     SponsoredLogs.sponsor!(html_probability: 1.0, ads: [{ text: "Trailing ad", weight: 1 }])
 

@@ -14,7 +14,12 @@ module SponsoredLogs
     # comment: "<!-- [AD] <text> -->". Returns nil when no ad is eligible. No
     # ANSI color: it is meaningless in HTML source, so the copy stays plain.
     #
-    def render(config, ledger)
+    # surface: names the placement so the ledger can break impressions down by
+    # where they served. The controller patch passes :page, the partial patch
+    # passes :partial; it defaults to :page (the original whole-page caller) so
+    # existing callers keep their surface without a change.
+    #
+    def render(config, ledger, surface: Surfaces::PAGE)
       ad = Advertisers.pick(
         config.ads,
         mode: config.selection,
@@ -22,7 +27,7 @@ module SponsoredLogs
       )
       return if ad.nil?
 
-      ledger.record(ad)
+      ledger.record(ad, surface: surface)
 
       prefix = config.ad_prefix.to_s.strip
       body = prefix.empty? ? ad[:text] : "#{prefix} #{ad[:text]}"

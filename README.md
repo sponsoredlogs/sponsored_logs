@@ -531,6 +531,7 @@ SponsoredLogs.report
 # => {
 #      impressions: 1500,
 #      spend: 31.5,
+#      impressions_by_surface: { log: 1200, page: 90, partial: 210, unknown: 0 },
 #      ads: [
 #        { text: "Brought to you by Contoso...", impressions: 1000, cpm: 22.0, spend: 22.0 },
 #        { text: "Initech...",                   impressions: 500,  cpm: 8.0,  spend: 4.0 }
@@ -543,6 +544,13 @@ the raw figures. `cpm` is tracked in both selection modes; it only affects
 *which* ad is chosen when `selection` is `:cpm`. Clear the tally with
 `SponsoredLogs.reset_ledger!`.
 
+**Know your channel mix.** Inventory sells on three surfaces now (the line, the
+page, and the component), so a single blended number no longer tells the whole
+story. `impressions_by_surface` books the demand per channel, so you can see at
+a glance where the yield is landing. The count is per surface and settles to the
+same ledger as everything else; no impression goes to waste, and none goes
+unattributed.
+
 For a formatted, log-friendly table, use `SponsoredLogs.report_text`, which
 lists ads by descending spend:
 
@@ -553,6 +561,7 @@ Brought to you by Contoso   1000    22.00      22.00
 Initech...                   500     8.00       4.00
 ----------------------------------------------------
 TOTAL                       1500                26.00
+By surface: log 1200 | page 90 | partial 210 | unknown 0
 ```
 
 ### 📊 The Command Center (Rails)

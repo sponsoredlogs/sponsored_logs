@@ -26,7 +26,7 @@ module SponsoredLogs
       return unless response
       return unless html_response?(response)
 
-      comment = SponsoredLogs.maybe_html_comment
+      comment = SponsoredLogs.maybe_html_comment(surface: SponsoredLogs::Surfaces::PAGE)
       return if comment.nil?
 
       response.body = "#{response.body}#{comment}"

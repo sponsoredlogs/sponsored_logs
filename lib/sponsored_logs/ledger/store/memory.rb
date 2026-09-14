@@ -13,15 +13,19 @@ module SponsoredLogs
           super
           @mutex = Mutex.new
           @impressions = Hash.new(0)
+          @surfaces = Hash.new { |h, id| h[id] = Hash.new(0) }
           @cpm = {}
           @text = {}
         end
 
-        def record(ad)
+        def record(ad = nil, surface: Surfaces::UNKNOWN, **ad_kwargs)
+          ad = Store.coerce_ad(ad, ad_kwargs)
           id = Identity.id_for(ad)
+          surface = Surfaces.coerce(surface)
 
           @mutex.synchronize do
             @impressions[id] += 1
+            @surfaces[id][surface] += 1
             @cpm[id] = ad[:cpm].to_f
             @text[id] = ad[:text].to_s
           end
@@ -35,9 +39,18 @@ module SponsoredLogs
           end
         end
 
+        def surface_snapshot
+          @mutex.synchronize do
+            @surfaces.each_with_object({}) do |(id, tally), acc|
+              acc[id] = tally.dup
+            end
+          end
+        end
+
         def reset
           @mutex.synchronize do
             @impressions = Hash.new(0)
+            @surfaces = Hash.new { |h, id| h[id] = Hash.new(0) }
             @cpm = {}
             @text = {}
           end

@@ -18,6 +18,10 @@ RSpec.describe SponsoredLogs::Ledger::Store::ActiveRecord do
         t.text    :text,        null: false
         t.integer :impressions, null: false, default: 0
         t.float   :cpm,         null: false, default: 0.0
+        t.integer :impressions_log,     null: false, default: 0
+        t.integer :impressions_page,    null: false, default: 0
+        t.integer :impressions_partial, null: false, default: 0
+        t.integer :impressions_unknown, null: false, default: 0
         t.timestamps
       end
       add_index :sponsored_logs_impressions, :ad_id, unique: true
@@ -73,6 +77,22 @@ RSpec.describe SponsoredLogs::Ledger::Store::ActiveRecord do
     threads.each(&:join)
 
     expect(store.snapshot["hot"][:impressions]).to eq(100)
+  end
+
+  it "records a per-surface tally on the same row as the per-ad total", :aggregate_failures do
+    store.record({ id: "a", text: "Ad A", weight: 1, cpm: 10.0 }, surface: :log)
+    store.record({ id: "a", text: "Ad A", weight: 1, cpm: 10.0 }, surface: :page)
+    store.record({ id: "a", text: "Ad A", weight: 1, cpm: 10.0 }, surface: :log)
+
+    expect(store.snapshot["a"][:impressions]).to eq(3)
+    expect(store.surface_snapshot).to eq("a" => { log: 2, page: 1 })
+  end
+
+  it "defaults a surface-less record to :unknown and keeps the old snapshot shape", :aggregate_failures do
+    store.record(id: "a", text: "Ad A", weight: 1, cpm: 10.0)
+
+    expect(store.snapshot).to eq("a" => { text: "Ad A", impressions: 1, cpm: 10.0 })
+    expect(store.surface_snapshot).to eq("a" => { unknown: 1 })
   end
 
   it "reset clears the rows" do

@@ -22,10 +22,38 @@ RSpec.describe SponsoredLogs::Ledger::Store::Memory do
     )
   end
 
+  it "records a per-surface tally alongside the per-ad total", :aggregate_failures do
+    store.record({ id: "a", text: "Ad A", weight: 1, cpm: 10.0 }, surface: :log)
+    store.record({ id: "a", text: "Ad A", weight: 1, cpm: 10.0 }, surface: :page)
+    store.record({ id: "a", text: "Ad A", weight: 1, cpm: 10.0 }, surface: :log)
+
+    expect(store.snapshot["a"][:impressions]).to eq(3)
+    expect(store.surface_snapshot).to eq("a" => { log: 2, page: 1 })
+  end
+
+  it "coerces an unknown surface to :unknown in the tally" do
+    store.record({ id: "a", text: "Ad A", weight: 1, cpm: 10.0 }, surface: :bogus)
+
+    expect(store.surface_snapshot).to eq("a" => { unknown: 1 })
+  end
+
+  it "defaults a surface-less record to :unknown and keeps the old snapshot shape", :aggregate_failures do
+    store.record(id: "a", text: "Ad A", weight: 1, cpm: 10.0)
+
+    expect(store.snapshot).to eq("a" => { text: "Ad A", impressions: 1, cpm: 10.0 })
+    expect(store.surface_snapshot).to eq("a" => { unknown: 1 })
+  end
+
   it "reset clears the snapshot" do
     store.record(id: "a", text: "Ad A", weight: 1, cpm: 10.0)
     store.reset
     expect(store.snapshot).to eq({})
+  end
+
+  it "reset clears the surface tally too" do
+    store.record({ id: "a", text: "Ad A", weight: 1, cpm: 10.0 }, surface: :log)
+    store.reset
+    expect(store.surface_snapshot).to eq({})
   end
 
   it "records concurrently without losing increments" do
@@ -78,9 +106,31 @@ RSpec.describe SponsoredLogs::Ledger::Store::Redis do
     )
   end
 
+  it "records a per-surface tally via the client alongside the per-ad total", :aggregate_failures do
+    store.record({ id: "a", text: "Ad A", weight: 1, cpm: 10.0 }, surface: :log)
+    store.record({ id: "a", text: "Ad A", weight: 1, cpm: 10.0 }, surface: :page)
+    store.record({ id: "a", text: "Ad A", weight: 1, cpm: 10.0 }, surface: :log)
+
+    expect(store.snapshot["a"][:impressions]).to eq(3)
+    expect(store.surface_snapshot).to eq("a" => { log: 2, page: 1 })
+  end
+
+  it "defaults a surface-less record to :unknown and keeps the old snapshot shape", :aggregate_failures do
+    store.record(id: "a", text: "Ad A", weight: 1, cpm: 10.0)
+
+    expect(store.snapshot).to eq("a" => { text: "Ad A", impressions: 1, cpm: 10.0 })
+    expect(store.surface_snapshot).to eq("a" => { unknown: 1 })
+  end
+
   it "reset deletes the keys" do
     store.record(id: "a", text: "Ad A", weight: 1, cpm: 10.0)
     store.reset
     expect(store.snapshot).to eq({})
+  end
+
+  it "reset deletes the per-surface keys too" do
+    store.record({ id: "a", text: "Ad A", weight: 1, cpm: 10.0 }, surface: :log)
+    store.reset
+    expect(store.surface_snapshot).to eq({})
   end
 end

@@ -75,6 +75,15 @@ RSpec.describe SponsoredLogs::PartialPatch do
         .to change { SponsoredLogs.ledger.total_impressions }.by(1)
     end
 
+    it "records the impression to the :partial surface", :aggregate_failures do
+      SponsoredLogs.reset_ledger!
+      SponsoredLogs.sponsor!(partial_ads: true, html_probability: 1.0, ads: [{ text: "Shared", weight: 1, cpm: 10.0 }])
+
+      described_class.decorate("<div>Component body content</div>")
+
+      expect(SponsoredLogs.report[:impressions_by_surface]).to eq(log: 0, page: 0, partial: 1, unknown: 0)
+    end
+
     it "draws from the same campaigns as logs and pages" do
       SponsoredLogs.sponsor!(partial_ads: true, html_probability: 1.0, ads: [{ text: "OnlyCampaign", weight: 1 }])
 

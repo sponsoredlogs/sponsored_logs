@@ -42,7 +42,7 @@ module SponsoredLogs
       return rendered unless SponsoredLogs.configuration.partial_ads
       return rendered unless HtmlComment.injectable?(rendered.to_s)
 
-      comment = SponsoredLogs.maybe_html_comment
+      comment = SponsoredLogs.maybe_html_comment(surface: SponsoredLogs::Surfaces::PARTIAL)
       return rendered if comment.nil?
 
       "#{rendered}#{comment}"
